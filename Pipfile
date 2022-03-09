@@ -7,10 +7,11 @@ name = "pypi"
 requests = "*"
 beautifulsoup4 = "*"
 rich = "*"
-tabula-py = "*"
 pandas = "*"
+tabula-py = "*"
 
 [dev-packages]
+pytest = "*"
 
 [requires]
 python_version = "3.10"

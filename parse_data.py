@@ -3,7 +3,7 @@ import tabula
 
 file = "./data/2021/2021.North_Island_Championships.pdf"
 
-results = tabula.read_pdf(file)
+results = tabula.read_pdf(file, pages=2)
 
 
 def main():
