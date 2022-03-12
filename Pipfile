@@ -9,6 +9,8 @@ beautifulsoup4 = "*"
 rich = "*"
 pandas = "*"
 tabula-py = "*"
+asyncio = "*"
+aiohttp = "*"
 
 [dev-packages]
 pytest = "*"

@@ -11,7 +11,23 @@ test_athlete = {
     "yearborn": 1900,
 }
 
+alter_athlete = {
+    "yearborn": 1901,
+}
+
+test_comp = {
+    "date_start": "2022-03-02",
+    "date_end": "2022-03-02",
+    "location": "test location",
+    "competition_name": "Test name",
+}
+
 # lifter_api = LifterAPI()
 lifter_api = LifterAPI(auth_token=os.getenv("API_TOKEN"))
 
-print(lifter_api.create_athlete(**test_athlete))
+response = lifter_api.create_competition(**test_comp)
+
+
+print(response)
+print(type(response))
+print(isinstance(response, dict))
