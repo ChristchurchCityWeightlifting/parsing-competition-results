@@ -1,12 +1,14 @@
 import logging
-from typing import List, Dict
+from typing import Dict
 
 import requests
 
-from .base import BaseLifterAPI
-from .defaults import URL, VERSION, ATHLETE_FIELDS, COMPETITION_FIELDS, LIFT_FIELDS
+from .mixins import AthleteMixin, CompetitionMixin, LiftMixin
+from .defaults import URL, VERSION
 from .exceptions import (
-    NotAllowedError,
+    TokenNotProvidedError,
+    TokenNotValidError,
+    MissingOrExtraValuesError,
 )
 
 logging.basicConfig(
@@ -14,7 +16,88 @@ logging.basicConfig(
 )
 
 
-class LifterAPI(BaseLifterAPI):
+class BaseLifterAPI:
+    # TODO: write doc string
+    def __init__(self, url: str, version: str, auth_token: str) -> None:
+        self.url = url
+        self.version = version
+        self._auth_token = auth_token
+        self.__access_token = "_"  # cannot be empty string
+
+    def __verify_access_token(self) -> bool:
+        """Checks if the access token is true and valid.
+
+        Will return True if the access token is verfied and current; returns False if the access token needs to be refreshed.
+
+        Returns:
+            bool: result of above logic
+        """
+        if self._auth_token is None:
+            raise TokenNotProvidedError
+
+        response = requests.post(
+            f"{self.url}/api/token/verify", json={"token": self.__access_token}
+        )
+        return response.json().get("code") != "token_not_valid"
+
+    def _obtain_access_token(self) -> str:
+        """This obtains the access key.
+
+        Also checks if the current access key is valid as not to refresh another key for no reason.
+
+        Raises:
+            TokenNotValidException: There was a problems with the refresh token. Most likely, it is not valid
+
+        Returns:
+            str: Access token
+        """
+        # TODO: introduce async may need to try multiple times
+        # TODO: introduce async
+
+        if not self.__verify_access_token():
+            response = requests.post(
+                f"{self.url}/api/token/refresh/",
+                data={"refresh": f"{self._auth_token}"},
+            )
+            if response.status_code == 401:
+                # the refresh token is no longer valid
+                raise TokenNotValidError
+
+            self.__access_token = response.json()["access"]
+        return self.__access_token
+
+    def _provide_authorization_header(self) -> Dict[str, str]:
+        """This provides the authorization header.
+
+        It will also obtain the access key (which also in turn makes sure the access key is verfied.
+
+        Returns:
+            Dict[str, str]: authorization header
+        """
+        access_token = self._obtain_access_token()
+        headers = {}
+        headers["Authorization"] = f"Bearer {access_token}"
+        return headers
+
+    def _verify_create_kwargs(
+        self, input_fields: Dict[str, str], required_fields: Dict[str, str]
+    ) -> None:
+        unknown_keys = [key for key in input_fields if key not in required_fields]
+        missing_keys = [key for key in required_fields if key not in input_fields]
+        if any([unknown_keys, missing_keys]):
+            raise MissingOrExtraValuesError(message=f"{unknown_keys=}\n{missing_keys=}")
+
+    def _verify_edit_kwargs(
+        self, input_fields: Dict[str, str], required_fields: Dict[str, str]
+    ) -> None:
+        if not input_fields:
+            raise MissingOrExtraValuesError(message=f"No values provided")
+        unknown_keys = [key for key in input_fields if key not in required_fields]
+        if unknown_keys:
+            raise MissingOrExtraValuesError(message=f"{unknown_keys=}")
+
+
+class LifterAPI(BaseLifterAPI, AthleteMixin, CompetitionMixin, LiftMixin):
     """
     API for Lifter
 
@@ -23,211 +106,3 @@ class LifterAPI(BaseLifterAPI):
 
     def __init__(self, url=URL, version=VERSION, auth_token=None):
         super().__init__(url, version, auth_token)
-
-    def athletes(self) -> List[Dict[str, str]]:
-        response = requests.get(f"{self.url}/{self.version}/athletes")
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def get_athlete(self, athlete_id: str) -> Dict[str, str]:
-        response = requests.get(f"{self.url}/{self.version}/athletes/{athlete_id}")
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 404:
-            return {"detail": "Athlete does not exist."}
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def create_athlete(self, **kwargs) -> Dict[str, str]:
-        self._verify_create_kwargs(kwargs, ATHLETE_FIELDS)
-        response = requests.post(
-            f"{self.url}/{self.version}/athletes",
-            headers=self._provide_authorization_header(),
-            json=kwargs,
-        )
-        if response.status_code in [201, 200, 403, 401]:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def edit_athlete(self, athlete_id: str, **kwargs) -> Dict[str, str]:
-        self._verify_edit_kwargs(kwargs, ATHLETE_FIELDS)
-        response = requests.patch(
-            f"{self.url}/{self.version}/athletes/{athlete_id}",
-            headers=self._provide_authorization_header(),
-            json=kwargs,
-        )
-        if response.status_code in [200, 403]:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def delete_athlete(self, athlete_id: str) -> Dict[str, str]:
-        response = requests.delete(
-            f"{self.url}/{self.version}/athletes/{athlete_id}",
-            headers=self._provide_authorization_header(),
-        )
-        if response.status_code in [200, 204]:
-            return {"detail": "Athlete entry deleted."}
-        elif response.status_code == 403:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    # TODO write competition functions
-
-    def competitions(self) -> List[Dict[str, str]]:
-        response = requests.get(f"{self.url}/{self.version}/competitions")
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def get_competition(self, competition_id: str) -> Dict[str, str]:
-        response = requests.get(
-            f"{self.url}/{self.version}/competitions/{competition_id}"
-        )
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 404:
-            return {"detail": "Competition does not exist."}
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def create_competition(self, **kwargs) -> Dict[str, str]:
-        self._verify_create_kwargs(kwargs, COMPETITION_FIELDS)
-        response = requests.post(
-            f"{self.url}/{self.version}/competitions",
-            headers=self._provide_authorization_header(),
-            json=kwargs,
-        )
-        if response.status_code in [201, 200, 403, 401]:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def edit_competition(self, competition_id: str, **kwargs) -> Dict[str, str]:
-        self._verify_edit_kwargs(kwargs, COMPETITION_FIELDS)
-        response = requests.patch(
-            f"{self.url}/{self.version}/competitions/{competition_id}",
-            headers=self._provide_authorization_header(),
-            json=kwargs,
-        )
-        if response.status_code in [201, 200, 403, 401]:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def delete_competition(self, competition_id: str) -> Dict[str, str]:
-        response = requests.delete(
-            f"{self.url}/{self.version}/competitions/{competition_id}",
-            headers=self._provide_authorization_header(),
-        )
-        if response.status_code in [200, 204]:
-            return {"detail": "Competition entry deleted."}
-        elif response.status_code == 403:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    # TODO write lift
-
-    def lifts(self, competition_id: str) -> List[Dict[str, str]]:
-        response = requests.get(
-            f"{self.url}/{self.version}/competitions/{competition_id}/lift"
-        )
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise NotAllowedError(message=f"{response.status_code=}")
-
-    def get_lift(self, competition_id: str, lift_id: int) -> Dict[str, str]:
-        response = requests.get(
-            f"{self.url}/{self.version}/competitions/{competition_id}/lift/{lift_id}"
-        )
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 404:
-            return {"detail": "Lift does not exist."}
-        else:
-            raise NotAllowedError(message=f"{response.status_code=}")
-
-    def create_lift(self, competition_id: str, **kwargs) -> Dict[str, str]:
-        self._verify_create_kwargs(kwargs, LIFT_FIELDS)
-        response = requests.post(
-            f"{self.url}/{self.version}/competitions/{competition_id}/lift",
-            headers=self._provide_authorization_header(),
-            json=kwargs,
-        )
-        if response.status_code in [201, 200, 403, 401]:
-            logging.debug("Lift created")
-            return response.json()
-        elif (
-            self.get_competition(competition_id).get("detail")
-            == "Competition does not exist."
-        ):
-            return self.get_competition(competition_id)
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def edit_lift(self, competition_id: str, lift_id: str, **kwargs):
-        self._verify_edit_kwargs(kwargs, LIFT_FIELDS)
-        response = requests.patch(
-            f"{self.url}/{self.version}/competitions/{competition_id}/lift/{lift_id}",
-            headers=self._provide_authorization_header(),
-            json=kwargs,
-        )
-        if response.status_code in [200, 403]:
-            return response.json()
-        elif (
-            self.get_competition(competition_id).get("detail")
-            == "Competition does not exist."
-        ):
-            return self.get_competition(competition_id)
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )
-
-    def delete_lift(self, competition_id: str, lift_id: str):
-        response = requests.delete(
-            f"{self.url}/{self.version}/competitions/{competition_id}/lift/{lift_id}",
-            headers=self._provide_authorization_header(),
-        )
-        if response.status_code in [200, 204]:
-            return {"detail": "Lift entry deleted."}
-        elif (
-            self.get_competition(competition_id).get("detail")
-            == "Competition does not exist."
-        ):
-            return self.get_competition(competition_id)
-        elif response.status_code == 403:
-            return response.json()
-        else:
-            raise NotAllowedError(
-                message=f"status code returned: {response.status_code}"
-            )

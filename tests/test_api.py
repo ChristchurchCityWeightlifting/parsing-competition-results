@@ -1,7 +1,5 @@
-from unittest import mock
 import pytest
 
-from lifter_api_wrapper import LifterAPI
 from lifter_api_wrapper.exceptions import (
     TokenNotProvidedError,
     MissingOrExtraValuesError,
