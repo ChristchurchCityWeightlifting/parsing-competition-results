@@ -1,11 +1,12 @@
-# parsing-competition-results
+# Parsing the Competition Results
 
-This code includes code used to turn pdf and excel files into code that is readable by lifter-api
+This code includes code used to turn pdf and excel files into code that is readable by [lifter-api](https://github.com/ChrisrchurchCityWeightlifting/lifter-api)
 
 ## Requirements
 
 - AWS SDK and credentials
-- Jupyter set u`
+- Jupyter set up
+- Python 3.10
 - `lifter-api-wrapper` (I'm using `pipenv` instead of `conda`)
 
 ## How This Works
@@ -35,3 +36,7 @@ The process:
             └── parsing.ipynb # <=== CODE IS HERE
 
 ```
+
+## Contributions
+
+I'm all alone!
