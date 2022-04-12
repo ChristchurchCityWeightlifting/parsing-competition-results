@@ -3,17 +3,25 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[[source]]
+url = "https://test.pypi.org/simple"
+verify_ssl = true
+name = "testpypi"
+
+[[source]]
+url = "https://test.pypi.org/simple/"
+verify_ssl = true
+name = "testpypi-431"
+
 [packages]
-requests = "*"
-beautifulsoup4 = "*"
-rich = "*"
-pandas = "*"
 tabula-py = "*"
-asyncio = "*"
-aiohttp = "*"
+boto3 = "*"
+pillow = "*"
+lifter-api-wrapper = "==0.1.4"
 
 [dev-packages]
 pytest = "*"
+ipykernel = "*"
 
 [requires]
 python_version = "3.10"
