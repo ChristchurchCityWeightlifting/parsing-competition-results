@@ -14,10 +14,11 @@ verify_ssl = true
 name = "testpypi-431"
 
 [packages]
-tabula-py = "*"
 boto3 = "*"
 pillow = "*"
-lifter-api-wrapper = "==0.1.4"
+lifter-api-wrapper = "==0.1.5"
+openpyxl = "*"
+pandas = "*"
 
 [dev-packages]
 pytest = "*"
