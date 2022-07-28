@@ -3,26 +3,18 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
-[[source]]
-url = "https://test.pypi.org/simple"
-verify_ssl = true
-name = "testpypi"
-
-[[source]]
-url = "https://test.pypi.org/simple/"
-verify_ssl = true
-name = "testpypi-431"
-
 [packages]
-boto3 = "*"
-pillow = "*"
-lifter-api-wrapper = "==0.1.5"
 openpyxl = "*"
+lifter-api-wrapper = "*"
+rich = "*"
+xlrd = "*"
 pandas = "*"
+typer = {extras = ["all"], version = "*"}
+requests = "*"
+numpy = "*"
 
 [dev-packages]
 pytest = "*"
-ipykernel = "*"
 
 [requires]
 python_version = "3.10"
