@@ -6,12 +6,13 @@ name = "pypi"
 [packages]
 openpyxl = "*"
 lifter-api-wrapper = "*"
-rich = "*"
 xlrd = "*"
 pandas = "*"
 typer = {extras = ["all"], version = "*"}
 requests = "*"
 numpy = "*"
+streamlit = "*"
+watchdog = "*"
 
 [dev-packages]
 pytest = "*"
