@@ -13,6 +13,7 @@ requests = "*"
 numpy = "*"
 streamlit = "*"
 watchdog = "*"
+graphviz = "*"
 
 [dev-packages]
 pytest = "*"

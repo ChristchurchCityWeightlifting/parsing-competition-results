@@ -1,16 +1,15 @@
 """Main.py."""
+import datetime
 import os
 from pathlib import Path
 from typing import Optional
 
 from lifter_api import LifterAPI
-import pandas as pd
 from requests.exceptions import HTTPError
 import streamlit as st
 
 from utils.types import CompetitionType, AthleteType
-from file import CompetitionFile, FILE_TYPES
-
+from file import CompetitionFile
 
 BASE_DIR = Path(__file__).parent.parent.parent
 
@@ -76,51 +75,145 @@ def check_athlete_exists(api: LifterAPI, athlete: AthleteType) -> str | None:
                 return options[i]["reference_id"]
 
 
-# TODO: move LIFT_SHEETNAME somewhere
-LIFT_SHEETNAMES = ["Men's Results", "Women's Results"]
-
-
 def main():
     """Run main."""
     st.header("Assessing Competition File")
+    st.graphviz_chart(
+        """
+        digraph {
+            competition -> lift
+            athlete -> lift
+        }
+        """
+    )
 
-    EXTRA_SELECT_DIR_OPTIONS = ["Upload"]
+    data_dir = BASE_DIR / "data"
+
     selected_dir = st.radio(
         "Select Directory:",
-        list_data_directories() + EXTRA_SELECT_DIR_OPTIONS,
+        [data_dir, "Upload"],
     )
 
     if selected_dir == "Upload":
         selected_file = st.file_uploader("Upload file (.xls, .xlsx)")
     else:
-        selected_file = st.selectbox(
-            "Select File:", list_data_files(selected_dir)
-        )
-
-    if selected_dir == "Upload" or selected_dir.stem == "data":
-        selected_file_type = st.selectbox("Select File Type:", FILE_TYPES)
-    else:
-        selected_file_type = selected_dir.stem
+        directories = [x for x in selected_dir.iterdir() if x.is_dir()]
+        selected_directory = st.selectbox("Select Directory:", directories)
+        files = list(selected_directory.glob("**/*.xls[x]"))
+        idx = 0
+        for i, file in enumerate(files):
+            if "result" in str(file):
+                idx = i
+                break
+        selected_file = st.selectbox("Select File:", files, index=idx)
 
     comp = CompetitionFile(
         selected_file,
-        selected_file_type,
     )
-    if selected_file_type == FILE_TYPES[0]:
-        default_sheets = LIFT_SHEETNAMES
-    elif selected_file_type == FILE_TYPES[1]:
-        default_sheets = comp.sheetnames
-
     sheet = st.multiselect(
-        "Select Sheet(s): ", comp.sheetnames, default=default_sheets
+        "Select Sheet(s): ", comp.sheetnames, default=comp.sheetnames
     )
+
     df = comp.extract(*sheet)
-    st.dataframe(df)
+    with st.sidebar:
+        st.dataframe(df)
+
+    items = list(df.columns) + [
+        item for _, row in df.iterrows() for item in row
+    ]
+
+    # def contains_number(string: str) -> bool:
+    #     return any([char.isdigit() for char in string])
 
     st.subheader("Competition Data")
+    if not any(list(comp.competition.values())):
+        competition_input = {}
+        competition_input["name"] = st.selectbox(
+            "name",
+            [item for item in items if isinstance(item, str)],
+        )
+        competition_input["location"] = st.selectbox(
+            "location",
+            [item for item in items if isinstance(item, str)],
+            index=21,
+        )
+        dates = [
+            item
+            for item in items
+            if isinstance(item, datetime.datetime)
+            # unlikely to have date as a string
+            # or isinstance(item, str)
+            # and contains_number(item)
+        ]
+        competition_input["date_start"] = st.selectbox("date_start", dates)
+        competition_input["date_end"] = st.selectbox(
+            "date_end",
+            sorted(dates, reverse=True),
+        )
+        comp.competition = competition_input
+
     st.write(comp.competition)
+    st.dataframe(df)
+
     st.subheader("Lift Data")
-    st.dataframe(pd.DataFrame(comp.lifts))
+    if len(comp.lifts) == 0:
+        lifts_input = {}
+        lifts_input["athlete"] = {}
+
+        lifts_input["athlete"]["first_name"] = st.selectbox(
+            "athlete first_name", df.columns, index=1
+        )
+        lifts_input["athlete"]["last_name"] = st.selectbox(
+            "athlete last_name", df.columns, index=2
+        )
+        lifts_input["athlete"]["yearborn"] = st.selectbox(
+            "athlete yearborn", df.columns, index=2
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            lifts_input["snatch_first"] = st.selectbox(
+                "snatch_first", df.columns, index=5
+            )
+            lifts_input["snatch_second"] = st.selectbox(
+                "snatch_second", df.columns, index=6
+            )
+            lifts_input["snatch_third"] = st.selectbox(
+                "snatch_third", df.columns, index=7
+            )
+
+        with col2:
+            lifts_input["cnj_first"] = st.selectbox(
+                "cnj_first", df.columns, index=8
+            )
+            lifts_input["cnj_second"] = st.selectbox(
+                "cnj_second", df.columns, index=9
+            )
+            lifts_input["cnj_third"] = st.selectbox(
+                "cnj_third", df.columns, index=10
+            )
+
+        lifts_input["lottery_number"] = st.selectbox(
+            "lottery_number", df.columns, index=0
+        )
+        lifts_input["bodyweight"] = st.selectbox(
+            "bodyweight", df.columns, index=4
+        )
+        lifts_input["team"] = st.selectbox("team", df.columns, index=3)
+
+        lifts_input["weigth_category"] = st.selectbox(
+            "weigth_category", df.columns, index=3
+        )
+        lifts_input["session_number"] = st.selectbox(
+            "session_number", df.columns, index=3
+        )
+    with st.empty():
+        comp.lifts = lifts_input
+        st.success("Success in parsing lifts")
+
+    st.dataframe(comp.lifts)
+    st.dataframe(comp.athletes)
 
     st.subheader("Uploading to Database")
     local = st.radio("Run locally?", [True, False])
